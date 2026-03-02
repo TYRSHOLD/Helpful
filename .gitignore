@@ -1,0 +1,20 @@
+# Xcode
+build/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.pbxuser
+*.perspectivev3
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+Packages/
+
+# Secrets
+Helpful/Secrets.plist
+
+# macOS
+.DS_Store
+*.swp
+*~
