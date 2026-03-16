@@ -4,17 +4,28 @@ import Charts
 struct SpendingView: View {
 
     @Binding var selectedTab: Int
+    @Binding var pendingMoreDestination: MoreDestination?
     @Environment(TransactionViewModel.self) var transactionVM
     @Environment(BudgetViewModel.self) var budgetVM
+    @Environment(GoalViewModel.self) var goalVM
+    @Environment(AuthViewModel.self) private var auth
+    @State private var plaidError: String?
+    @State private var plaidSuccess = false
 
-    init(selectedTab: Binding<Int> = .constant(0)) {
+    init(
+        selectedTab: Binding<Int> = .constant(0),
+        pendingMoreDestination: Binding<MoreDestination?> = .constant(nil)
+    ) {
         _selectedTab = selectedTab
+        _pendingMoreDestination = pendingMoreDestination
     }
 
     @State private var timeRange: TimeRange = .month
     @State private var selectedMonth: Date = Date()
     @State private var includeBills = true
     @State private var showingNetIncomeInfo = false
+    @State private var selectedForecastPoint: ForecastPoint?
+    @State private var isInteractingWithForecast = false
 
     var body: some View {
         ScrollView {
@@ -22,12 +33,28 @@ struct SpendingView: View {
                 headerControls
                 monthScroller
                 summaryCards
+                forecastSection
                 breakdownSection
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
         .navigationTitle("Spending")
         .navigationBarTitleDisplayMode(.large)
+        .alert("Plaid", isPresented: Binding(
+            get: { plaidError != nil },
+            set: { if !$0 { plaidError = nil } }
+        )) {
+            Button("OK", role: .cancel) { plaidError = nil }
+        } message: {
+            if let msg = plaidError { Text(msg) }
+        }
+        .alert("Bank connected", isPresented: $plaidSuccess) {
+            Button("OK") { plaidSuccess = false }
+        } message: {
+            Text("Your account is linked. Transactions will sync automatically.")
+        }
     }
 }
 
@@ -48,12 +75,21 @@ extension SpendingView {
 private extension SpendingView {
     var headerControls: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Text("Overview")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
             Picker("Range", selection: $timeRange) {
                 ForEach(TimeRange.allCases, id: \.self) { range in
                     Text(range.rawValue).tag(range)
                 }
             }
             .pickerStyle(.segmented)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(AppColors.elevatedBackground.opacity(0.95))
+            )
         }
     }
 
@@ -80,30 +116,37 @@ private extension SpendingView {
         let calendar = Calendar.current
         let maxValue = max(monthSummaries.map(\.income).max() ?? 1, monthSummaries.map(\.spend).max() ?? 1, 1)
 
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(monthSummaries) { summary in
+                    ForEach(Array(monthSummaries.enumerated()), id: \.element.id) { index, summary in
                         let isSelected = calendar.isDate(summary.date, equalTo: selectedMonth, toGranularity: .month)
                         monthCard(summary: summary, maxValue: maxValue, isSelected: isSelected) {
                             selectedMonth = summary.date
                         }
+
+                        if index < monthSummaries.count - 1 {
+                            let currentYear = calendar.component(.year, from: summary.date)
+                            let nextYear = calendar.component(.year, from: monthSummaries[index + 1].date)
+                            if currentYear != nextYear {
+                                VStack(spacing: 6) {
+                                    Rectangle()
+                                        .fill(Color.secondary.opacity(0.4))
+                                        .frame(width: 1, height: 40)
+                                    Text(String(nextYear))
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.secondary)
+                                        .rotationEffect(.degrees(-90))
+                                }
+                                .frame(width: 30)
+                            }
+                        }
                     }
-                    VStack(spacing: 6) {
-                        Rectangle()
-                            .fill(Color.secondary.opacity(0.4))
-                            .frame(width: 1, height: 40)
-                        Text(String(calendar.component(.year, from: Date())))
-                            .font(.caption.bold())
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(-90))
-                    }
-                    .frame(width: 30)
                 }
                 .padding(.top, 4)
             }
 
-            HStack(spacing: 16) {
+            HStack(spacing: 20) {
                 HStack(spacing: 6) {
                     Circle().fill(incomeChartColor).frame(width: 8, height: 8)
                     Text("Income").font(.caption).foregroundStyle(.secondary)
@@ -141,15 +184,15 @@ private extension SpendingView {
                 Text(summary.date, format: .dateTime.month(.abbreviated))
                     .font(.subheadline.bold())
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? AppColors.secondaryBackground : Color.clear)
+                    .fill(isSelected ? AppColors.elevatedBackground.opacity(0.95) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(isSelected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 2)
+                    .strokeBorder(isSelected ? AppColors.coral.opacity(0.35) : Color.clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
@@ -190,32 +233,192 @@ private extension SpendingView {
 
     var netIncome: Double { incomeTotal - expenseTotal }
 
+    var forecastResult: ForecastResult? {
+        guard timeRange == .month else { return nil }
+        let startingBalance = goalVM.totalSaved
+        let monthlyNet = netIncome
+        let months = 6
+        return ForecastEngine.makeSavingsForecast(
+            startingBalance: startingBalance,
+            monthlyNet: monthlyNet,
+            months: months
+        )
+    }
+
     var summaryCards: some View {
         VStack(spacing: 12) {
-            summaryRow(title: "Income", amount: incomeTotal, systemImage: "arrow.down.left.circle")
+            connectBankRow
+            summaryRow(title: "Income", amount: incomeTotal, systemImage: "arrow.down.left.circle", accentColor: AppColors.green)
 
             Button {
-                selectedTab = 7
+                pendingMoreDestination = .transactions
+                selectedTab = 4
             } label: {
-                summaryRowContent(title: "Total Spent", amount: expenseTotal, systemImage: "arrow.up.right.circle")
+                summaryRow(title: "Total Spent", amount: expenseTotal, systemImage: "arrow.up.right.circle", accentColor: AppColors.coral)
             }
             .buttonStyle(.plain)
 
             Button {
                 showingNetIncomeInfo = true
             } label: {
-                HStack {
-                    summaryRowContent(title: "Net Income", amount: netIncome, systemImage: "equal.circle")
-                    Image(systemName: "info.circle")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                summaryRow(title: "Net Income", amount: netIncome, systemImage: "equal.circle", accentColor: netIncome >= 0 ? AppColors.teal : .red)
             }
             .buttonStyle(.plain)
         }
         .sheet(isPresented: $showingNetIncomeInfo) {
             netIncomeInfoSheet
         }
+    }
+
+    private var connectBankRow: some View {
+        Button {
+            guard let uid = auth.currentUserId else { return }
+            PlaidService.shared.presentLink(
+                userId: uid,
+                onSuccess: { _ in
+                    plaidSuccess = true
+                    Task { await transactionVM.load() }
+                },
+                onExit: { },
+                onFailure: { plaidError = $0 }
+            )
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(AppColors.teal.opacity(0.16))
+                    Image(systemName: "link.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppColors.teal)
+                }
+                .frame(width: 32, height: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Connect bank")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text("Link your account to import transactions")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(AppColors.elevatedBackground.opacity(0.98))
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    var forecastSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Simple Savings Forecast")
+                .font(.headline)
+
+            if timeRange != .month {
+                Text("Switch to the Month range to see an interactive 6‑month savings forecast.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let forecast = forecastResult, !forecast.points.isEmpty {
+                let lastValue = forecast.points.last?.value ?? goalVM.totalSaved
+
+                ZStack {
+                    Chart {
+                        ForEach(forecast.points, id: \.id) { point in
+                            LineMark(
+                                x: .value("Month", point.date, unit: .month),
+                                y: .value("Estimated Savings", point.value)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [AppColors.teal, AppColors.skyBlue]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+
+                            if let selected = selectedForecastPoint,
+                               selected.id == point.id {
+                                PointMark(
+                                    x: .value("Month", point.date, unit: .month),
+                                    y: .value("Estimated Savings", point.value)
+                                )
+                                .symbolSize(80)
+                                .foregroundStyle(AppColors.coral)
+                                .annotation(position: .top) {
+                                    forecastCallout(for: point)
+                                }
+                            }
+                        }
+
+                        if let selected = selectedForecastPoint {
+                            RuleMark(
+                                x: .value("Selected Month", selected.date, unit: .month)
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .stride(by: .month)) { _ in
+                            AxisTick()
+                            AxisValueLabel(format: .dateTime.month(.abbreviated))
+                        }
+                    }
+                    .chartYAxis(.hidden)
+                    .chartOverlay { proxy in
+                        GeometryReader { geo in
+                            Rectangle()
+                                .fill(.clear)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            guard let plotFrame = proxy.plotContainerFrame else { return }
+                                            isInteractingWithForecast = true
+                                            let locationX = value.location.x - geo[plotFrame].origin.x
+                                            if let date: Date = proxy.value(atX: locationX) {
+                                                if let nearest = nearestForecastPoint(to: date, in: forecast.points) {
+                                                    selectedForecastPoint = nearest
+                                                }
+                                            }
+                                        }
+                                        .onEnded { _ in
+                                            isInteractingWithForecast = false
+                                        }
+                                )
+                        }
+                    }
+                    .frame(height: 200)
+                }
+
+                Text(summaryText(for: lastValue))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Once you have some net income this month, I'll show how your total savings could change over the next few months.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(AppColors.secondaryBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+        )
     }
 
     private var netIncomeInfoSheet: some View {
@@ -251,24 +454,33 @@ private extension SpendingView {
         }
     }
 
-    func summaryRow(title: String, amount: Double, systemImage: String) -> some View {
-        summaryRowContent(title: title, amount: amount, systemImage: systemImage)
-            .padding()
-            .background(AppColors.secondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
+    func summaryRow(title: String, amount: Double, systemImage: String, accentColor: Color) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(accentColor.opacity(0.16))
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 32, height: 32)
 
-    func summaryRowContent(title: String, amount: Double, systemImage: String) -> some View {
-        HStack {
-            Label(title, systemImage: systemImage)
-                .font(.subheadline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(currencyString(amount))
+                    .font(.headline.weight(.semibold))
+            }
+
             Spacer()
-            Text(currencyString(amount))
-                .font(.subheadline.bold())
         }
-        .padding()
-        .background(AppColors.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(AppColors.elevatedBackground.opacity(0.98))
+                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
+        )
     }
 }
 
@@ -383,6 +595,53 @@ private extension SpendingView {
         guard total > 0 else { return "0%" }
         let pct = value / total * 100
         return String(format: "%.0f%%", pct)
+    }
+
+    func nearestForecastPoint(to date: Date, in points: [ForecastPoint]) -> ForecastPoint? {
+        guard !points.isEmpty else { return nil }
+        return points.min(by: { lhs, rhs in
+            abs(lhs.date.timeIntervalSince1970 - date.timeIntervalSince1970) <
+            abs(rhs.date.timeIntervalSince1970 - date.timeIntervalSince1970)
+        })
+    }
+
+    func summaryText(for projectedSavings: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        let current = formatter.string(from: NSNumber(value: goalVM.totalSaved)) ?? "$0.00"
+        let projected = formatter.string(from: NSNumber(value: projectedSavings)) ?? "$0.00"
+
+        if netIncome > 0 {
+            return "If your net income stays about the same, your total saved across goals could grow from \(current) to around \(projected) over the next 6 months."
+        } else if netIncome < 0 {
+            return "Right now you're spending more than you earn. If that continues, your total saved across goals could trend down toward \(projected) over the next 6 months."
+        } else {
+            return "With net income around zero this month, your total saved across goals is likely to stay close to \(current) over the next 6 months."
+        }
+    }
+
+    func forecastCallout(for point: ForecastPoint) -> some View {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        let valueString = formatter.string(from: NSNumber(value: point.value)) ?? "$0.00"
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMM yyyy"
+
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(dateFormatter.string(from: point.date))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(valueString)
+                .font(.caption.bold())
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 4)
     }
 }
 

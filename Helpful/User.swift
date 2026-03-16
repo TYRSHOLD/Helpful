@@ -16,8 +16,16 @@ struct AppUser: Codable, Identifiable {
         var school: String
         var major: String
         var birthday: Date?
+        var opportunityInterests: [String]
 
-        static let empty = UserProfile(firstName: "", lastName: "", school: "", major: "", birthday: nil)
+        static let empty = UserProfile(
+            firstName: "",
+            lastName: "",
+            school: "",
+            major: "",
+            birthday: nil,
+            opportunityInterests: []
+        )
     }
 
     struct UserSettings: Codable {

@@ -5,6 +5,7 @@ struct InsightsView: View {
 
     @Environment(TransactionViewModel.self) var txnVM
     @Environment(BudgetViewModel.self) var budgetVM
+    @Environment(AIInsightsViewModel.self) var aiInsightsVM
 
     var body: some View {
         ScrollView {
@@ -17,6 +18,12 @@ struct InsightsView: View {
                     )
                     .padding(.top, 60)
                 } else {
+                    quickSummaryCard
+                    if let summary = aiInsightsVM.summaryText, !summary.isEmpty {
+                        aiSummaryCard(summary: summary)
+                    } else if let error = aiInsightsVM.errorMessage, !error.isEmpty {
+                        aiSummaryErrorCard(error: error)
+                    }
                     topCategoryCard
                     categoryPieChart
                     budgetVsActual
@@ -28,6 +35,140 @@ struct InsightsView: View {
         }
         .navigationTitle("Insights")
         .navigationBarTitleDisplayMode(.large)
+        .task(id: txnVM.transactions.count + budgetVM.budgets.count + (aiInsightsVM.summaryText?.count ?? 0)) {
+            await aiInsightsVM.refreshIfNeeded(
+                transactions: txnVM.transactions,
+                budgets: budgetVM.budgets,
+                goals: []
+            )
+        }
+    }
+
+    // MARK: - AI Summary
+
+    private func aiSummaryCard(summary: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(AppColors.coral)
+                Text("AI Summary")
+                    .font(.headline)
+                Spacer()
+            }
+            Text(summary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(AppColors.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func aiSummaryErrorCard(error: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(AppColors.coral)
+                Text("AI Summary")
+                    .font(.headline)
+                Spacer()
+            }
+            Text("AI is unavailable right now. You’ll still see insights below.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text(error)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(AppColors.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Quick Summary (non-AI)
+
+    private var quickSummaryCard: some View {
+        let cal = Calendar.current
+        let now = Date()
+
+        let monthTxns = txnVM.transactions.filter { cal.isDate($0.date, equalTo: now, toGranularity: .month) }
+        let income = monthTxns.filter { $0.kind == .income }.reduce(0) { $0 + $1.amount }
+        let expenses = monthTxns.filter { $0.kind == .expense }.reduce(0) { $0 + $1.amount }
+        let net = income - expenses
+
+        let last7Start = cal.date(byAdding: .day, value: -7, to: now) ?? now
+        let last7 = txnVM.transactions.filter { $0.kind == .expense && $0.date >= last7Start }
+        let prev7Start = cal.date(byAdding: .day, value: -14, to: now) ?? now
+        let prev7 = txnVM.transactions.filter { $0.kind == .expense && $0.date >= prev7Start && $0.date < last7Start }
+        let last7Total = last7.reduce(0) { $0 + $1.amount }
+        let prev7Total = prev7.reduce(0) { $0 + $1.amount }
+        let delta = last7Total - prev7Total
+
+        let grouped = Dictionary(grouping: monthTxns.filter { $0.kind == .expense }) { $0.parsedCategory }
+        let top = grouped.max(by: { $0.value.reduce(0) { $0 + $1.amount } < $1.value.reduce(0) { $0 + $1.amount } })
+        let topAmount = top?.value.reduce(0) { $0 + $1.amount } ?? 0
+
+        let monthName = currentMonthName
+        let budget = budgetVM.budgets.first(where: { $0.month == monthName })
+        let budgetRemaining = budget.map { max($0.total - $0.spent, 0) }
+
+        let nextStep: String = {
+            if let budget, budget.total > 0, budget.spent / budget.total >= 0.8 {
+                return "You’re close to your budget—pick one category to cut back on for the rest of the month."
+            }
+            if net < 0 {
+                return "Your spending is higher than your income this month—try setting a small budget and trimming your top category."
+            }
+            if top != nil, topAmount > 0 {
+                return "Try a mini‑goal: reduce \(top!.key.rawValue) by \(currencyString(max(topAmount * 0.1, 10))) next month."
+            }
+            return "Set a budget for this month to give your spending a target."
+        }()
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill")
+                    .foregroundStyle(AppColors.teal)
+                Text("Quick Summary")
+                    .font(.headline)
+                Spacer()
+            }
+
+            HStack {
+                Label("Net: \(currencyString(net))", systemImage: net >= 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(net >= 0 ? Color.secondary : Color.red)
+                Spacer()
+                if let remaining = budgetRemaining {
+                    Text("Budget left: \(currencyString(remaining))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("No budget set")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let top {
+                Text("Top spend: \(top.key.rawValue) · \(currencyString(topAmount))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            if prev7Total > 0 || last7Total > 0 {
+                Text("Last 7 days: \(currencyString(last7Total)) (\(delta >= 0 ? "+" : "")\(currencyString(delta)) vs previous 7 days)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(nextStep)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(AppColors.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Top Category

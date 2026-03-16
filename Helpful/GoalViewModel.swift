@@ -82,6 +82,7 @@ final class GoalViewModel {
         isLoading = true
         do {
             goals = try await service.fetchGoals()
+            syncWidgetData()
         } catch {
             errorMessage = error.localizedDescription
         }

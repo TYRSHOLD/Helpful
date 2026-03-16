@@ -33,6 +33,26 @@ struct AddGoalView: View {
                         }
                         .padding(.vertical, 4)
                     }
+
+                    HStack {
+                        Text("Custom")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        TextField("Tap to type any emoji", text: $emoji)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .onChange(of: emoji) { _, newValue in
+                                // Keep this field to a small emoji string; if user types text,
+                                // just keep the last character they entered.
+                                if newValue.count > 2 {
+                                    emoji = String(newValue.suffix(2))
+                                }
+                            }
+                    }
                 }
 
                 Section("What are you saving for?") {

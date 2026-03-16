@@ -68,4 +68,18 @@ final class DocumentViewModel {
             await load()
         }
     }
+
+    func removeBroken(_ document: UserDocument) async {
+        guard let id = document.id else {
+            print("[DocumentVM] Cannot remove broken doc: document.id is nil")
+            return
+        }
+        documents.removeAll { $0.id == id }
+        do {
+            try await service.deleteDocumentRecordOnly(id: id)
+        } catch {
+            print("[DocumentVM] Failed to delete broken document record: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+        }
+    }
 }

@@ -80,6 +80,30 @@ final class NotificationService {
         center.add(request)
     }
 
+    // MARK: - Daily spending reminder (8pm)
+
+    func scheduleDailySpendingReminder(hour: Int = 20, minute: Int = 0) {
+        let id = "daily-spending-reminder"
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+
+        let content = UNMutableNotificationContent()
+        content.title = "Quick money check-in"
+        content.body = "Log today’s spending and see where your money went."
+        content.sound = .default
+
+        var components = DateComponents()
+        components.hour = hour
+        components.minute = minute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        center.add(request)
+    }
+
+    func cancel(ids: [String]) {
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
     func cancelAll() {
         center.removeAllPendingNotificationRequests()
     }

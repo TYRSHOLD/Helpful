@@ -17,7 +17,17 @@ final class TransactionViewModel {
     @ObservationIgnored
     private let service = FirestoreService.shared
 
-    var totalSpent: Double { transactions.reduce(0) { $0 + $1.amount } }
+    var totalSpent: Double {
+        transactions
+            .filter { $0.kind == .expense }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    var totalIncome: Double {
+        transactions
+            .filter { $0.kind == .income }
+            .reduce(0) { $0 + $1.amount }
+    }
 
     var recentTransactions: [Transaction] {
         Array(transactions.prefix(5))
@@ -35,9 +45,9 @@ final class TransactionViewModel {
 
     private func syncWidgetData() {
         let cal = Calendar.current
-        let todayTxns = transactions.filter { cal.isDateInToday($0.date) }
-        let todayTotal = todayTxns.reduce(0) { $0 + $1.amount }
-        let recent = Array(transactions.prefix(3)).map {
+        let todayExpenses = transactions.filter { cal.isDateInToday($0.date) && $0.kind == .expense }
+        let todayTotal = todayExpenses.reduce(0) { $0 + $1.amount }
+        let recent = Array(transactions.sorted { $0.date > $1.date }.prefix(3)).map {
             WidgetDataManager.SpendingItem(category: $0.category, amount: $0.amount, note: $0.note)
         }
         WidgetDataManager.saveSpending(.init(todayTotal: todayTotal, recentItems: recent))
@@ -67,6 +77,7 @@ final class TransactionViewModel {
         isLoading = true
         do {
             transactions = try await service.fetchTransactions()
+            syncWidgetData()
         } catch {
             errorMessage = error.localizedDescription
         }

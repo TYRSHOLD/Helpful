@@ -11,10 +11,19 @@ struct AddDocumentView: View {
     @State private var selectedFileData: Data?
     @State private var selectedFileName: String?
     @State private var isUploading = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                            .font(.subheadline)
+                    }
+                }
+
                 Section("Document Title") {
                     TextField("e.g. Fall 2026 Syllabus", text: $title)
                 }
@@ -61,7 +70,7 @@ struct AddDocumentView: View {
             }
             .fileImporter(
                 isPresented: $showingFilePicker,
-                allowedContentTypes: [.pdf, .jpeg, .png, .heic],
+                allowedContentTypes: [.item],
                 allowsMultipleSelection: false
             ) { result in
                 handleFileResult(result)
@@ -83,24 +92,41 @@ struct AddDocumentView: View {
 
     private func handleFileResult(_ result: Result<[URL], Error>) {
         guard case .success(let urls) = result, let url = urls.first else { return }
-        guard url.startAccessingSecurityScopedResource() else { return }
+        guard url.startAccessingSecurityScopedResource() else {
+            Task { @MainActor in
+                errorMessage = "Could not access the selected file."
+            }
+            return
+        }
         defer { url.stopAccessingSecurityScopedResource() }
         do {
-            selectedFileData = try Data(contentsOf: url)
-            selectedFileName = url.lastPathComponent
+            let data = try Data(contentsOf: url)
+            let name = url.lastPathComponent
+            Task { @MainActor in
+                selectedFileData = data
+                selectedFileName = name
+                errorMessage = nil
+            }
         } catch {
-            print("Failed to read file:", error)
+            Task { @MainActor in
+                errorMessage = "Failed to read file: \(error.localizedDescription)"
+            }
         }
     }
 
     private func upload() {
         guard let data = selectedFileData, let fileName = selectedFileName else { return }
         isUploading = true
+        errorMessage = nil
         let uniqueName = "\(UUID().uuidString)_\(fileName)"
-        Task {
+        Task { @MainActor in
             await vm.upload(data: data, fileName: uniqueName, title: title)
             isUploading = false
-            dismiss()
+            if vm.errorMessage != nil {
+                errorMessage = vm.errorMessage
+            } else {
+                dismiss()
+            }
         }
     }
 }

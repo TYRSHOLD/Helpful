@@ -31,7 +31,8 @@ final class FirestoreService {
                 "firstName": "",
                 "lastName": "",
                 "school": "",
-                "major": ""
+                "major": "",
+                "opportunityInterests": []
             ],
             "settings": [
                 "notificationsEnabled": true,
@@ -53,12 +54,21 @@ final class FirestoreService {
             "firstName": profile.firstName,
             "lastName": profile.lastName,
             "school": profile.school,
-            "major": profile.major
+            "major": profile.major,
+            "opportunityInterests": profile.opportunityInterests
         ]
         if let birthday = profile.birthday {
             data["birthday"] = Timestamp(date: birthday)
         }
         try await ref.updateData(["profile": data])
+    }
+
+    func fetchOpportunityInterests() async throws -> [String] {
+        let ref = try userDoc()
+        let snapshot = try await ref.getDocument()
+        let data = snapshot.data() ?? [:]
+        let profile = data["profile"] as? [String: Any] ?? [:]
+        return profile["opportunityInterests"] as? [String] ?? []
     }
 
     func updateUserSettings(_ settings: AppUser.UserSettings) async throws {
@@ -207,7 +217,8 @@ final class FirestoreService {
 
     func uploadDocument(data: Data, fileName: String, title: String) async throws -> UserDocument {
         guard let uid else { throw ServiceError.notAuthenticated }
-        let storageRef = storage.reference().child("users/\(uid)/documents/\(fileName)")
+        let path = "users/\(uid)/documents/\(fileName)"
+        let storageRef = storage.reference().child(path)
         _ = try await storageRef.putDataAsync(data)
         let downloadURL = try await storageRef.downloadURL()
 
@@ -216,10 +227,18 @@ final class FirestoreService {
             "title": title,
             "fileName": fileName,
             "downloadURL": downloadURL.absoluteString,
-            "uploadedAt": Timestamp()
+            "uploadedAt": Timestamp(),
+            "storagePath": path
         ]
         let docRef = try await ref.collection("documents").addDocument(data: docData)
-        return UserDocument(id: docRef.documentID, title: title, fileName: fileName, downloadURL: downloadURL.absoluteString, uploadedAt: Date())
+        return UserDocument(
+            id: docRef.documentID,
+            title: title,
+            fileName: fileName,
+            downloadURL: downloadURL.absoluteString,
+            uploadedAt: Date(),
+            storagePath: path
+        )
     }
 
     func fetchDocuments() async throws -> [UserDocument] {
@@ -233,7 +252,22 @@ final class FirestoreService {
     func deleteDocument(doc: UserDocument) async throws {
         guard let uid, let id = doc.id else { throw ServiceError.notAuthenticated }
         let storageRef = storage.reference().child("users/\(uid)/documents/\(doc.fileName)")
-        try await storageRef.delete()
+        do {
+            try await storageRef.delete()
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == StorageErrorDomain,
+               nsError.code == StorageErrorCode.objectNotFound.rawValue {
+                // File already gone in Storage; proceed to delete Firestore record.
+            } else {
+                throw error
+            }
+        }
+        let ref = try userDoc()
+        try await ref.collection("documents").document(id).delete()
+    }
+
+    func deleteDocumentRecordOnly(id: String) async throws {
         let ref = try userDoc()
         try await ref.collection("documents").document(id).delete()
     }

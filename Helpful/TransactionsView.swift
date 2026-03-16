@@ -126,8 +126,11 @@ struct TransactionsView: View {
                 .autocorrectionDisabled()
         }
         .padding(10)
-        .background(AppColors.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(AppColors.elevatedBackground.opacity(0.98))
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 4)
+        )
         .padding([.horizontal, .top])
     }
 
@@ -225,6 +228,11 @@ struct TransactionsView: View {
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Transactions.csv")
         try? csv.data(using: .utf8)?.write(to: tempURL)
         let activity = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-        UIApplication.shared.windows.first?.rootViewController?.present(activity, animated: true)
+        if let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first,
+           let root = windowScene.windows.first?.rootViewController {
+            root.present(activity, animated: true)
+        }
     }
 }

@@ -10,6 +10,8 @@ struct ProfileView: View {
     @State private var lastName = ""
     @State private var school = ""
     @State private var major = ""
+    @State private var opportunityInterests: [String] = []
+    @State private var birthday: Date?
     @State private var notificationsEnabled = true
     @AppStorage("darkMode") private var darkMode = false
     @State private var isSaving = false
@@ -45,6 +47,23 @@ struct ProfileView: View {
                     TextField("Last Name", text: $lastName)
                     TextField("School", text: $school)
                     TextField("Major", text: $major)
+                }
+
+                Section("Opportunities") {
+                    NavigationLink {
+                        OpportunityPreferencesView(
+                            selected: $opportunityInterests,
+                            major: major
+                        )
+                    } label: {
+                        HStack {
+                            Text("Interests")
+                            Spacer()
+                            Text(opportunityInterests.isEmpty ? "All" : "\(opportunityInterests.count) selected")
+                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                        }
+                    }
                 }
 
                 Section {
@@ -130,6 +149,8 @@ struct ProfileView: View {
         lastName = user.profile.lastName
         school = user.profile.school
         major = user.profile.major
+        opportunityInterests = user.profile.opportunityInterests
+        birthday = user.profile.birthday
         notificationsEnabled = user.settings.notificationsEnabled
         darkMode = user.settings.darkMode
     }
@@ -146,6 +167,9 @@ struct ProfileView: View {
                         lastName: lastName,
                         school: school,
                         major: major
+                        ,
+                        birthday: birthday,
+                        opportunityInterests: opportunityInterests
                     )
                 )
                 try await service.updateUserSettings(

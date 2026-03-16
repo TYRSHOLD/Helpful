@@ -64,7 +64,7 @@ struct SwipeableCardView: View {
                 .opacity(saveOverlayOpacity * 2)
                 .padding(.trailing, 80)
 
-            Text("PASS")
+            Text("SKIP")
                 .font(.system(size: 44, weight: .black))
                 .foregroundStyle(AppColors.coral)
                 .rotationEffect(.degrees(15))
@@ -94,27 +94,33 @@ struct SwipeableCardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
+                    Text(opportunity.title)
+                        .font(.title3.bold())
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
                     Text(opportunity.employer)
                         .font(.subheadline.bold())
                         .foregroundStyle(.secondary)
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(.caption)
-                        Text(opportunity.location)
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.tertiary)
                 }
 
                 Spacer()
 
-                typeBadge
+                VStack(alignment: .trailing, spacing: 6) {
+                    typeBadge
+                    metaBadges
+                }
             }
 
-            Text(opportunity.title)
-                .font(.title3.bold())
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Text(opportunity.location)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
         }
         .padding(.bottom, 12)
     }
@@ -127,6 +133,29 @@ struct SwipeableCardView: View {
             .padding(.vertical, 5)
             .background(opportunity.type.color.opacity(0.12))
             .clipShape(Capsule())
+    }
+
+    private var metaBadges: some View {
+        HStack(spacing: 6) {
+            if opportunity.location.lowercased().contains("remote") {
+                badge("Remote", systemImage: "wifi")
+            }
+            badge("Quick apply", systemImage: "paperplane.fill")
+        }
+    }
+
+    private func badge(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.caption2)
+            Text(text)
+                .font(.caption2.bold())
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.secondary.opacity(0.10))
+        .clipShape(Capsule())
     }
 
     // MARK: - Body
@@ -147,13 +176,29 @@ struct SwipeableCardView: View {
 
     private var footerSection: some View {
         HStack {
-            Label {
-                Text(opportunity.datePosted, style: .date)
-            } icon: {
-                Image(systemName: "calendar")
+            if let url = URL(string: opportunity.applyURL), !opportunity.applyURL.isEmpty {
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.right.square")
+                        Text("Open & apply")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(AppColors.teal)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(AppColors.teal.opacity(0.10))
+                    .clipShape(Capsule())
+                }
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.left.and.right")
+                    Text("Swipe left to skip, right to save")
+                        .fontWeight(.semibold)
+                }
+                .font(.caption)
+                .foregroundStyle(.tertiary)
             }
-            .font(.caption)
-            .foregroundStyle(.tertiary)
 
             Spacer()
 

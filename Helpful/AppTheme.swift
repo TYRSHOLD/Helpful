@@ -3,20 +3,27 @@ import SwiftUI
 // MARK: - Color Palette
 
 enum AppColors {
-    static let coral = Color(red: 1.0, green: 0.42, blue: 0.42)
-    static let peach = Color(red: 1.0, green: 0.68, blue: 0.52)
-    static let orange = Color(red: 1.0, green: 0.55, blue: 0.30)
-    static let teal = Color(red: 0.20, green: 0.78, blue: 0.76)
-    static let mint = Color(red: 0.40, green: 0.90, blue: 0.80)
-    static let purple = Color(red: 0.58, green: 0.40, blue: 0.98)
-    static let lavender = Color(red: 0.72, green: 0.55, blue: 1.0)
-    static let skyBlue = Color(red: 0.30, green: 0.60, blue: 1.0)
-    static let lightBlue = Color(red: 0.55, green: 0.78, blue: 1.0)
-    static let yellow = Color(red: 1.0, green: 0.82, blue: 0.32)
-    static let green = Color(red: 0.30, green: 0.85, blue: 0.48)
+    // Accent palette
+    static let coral = Color(red: 0.99, green: 0.35, blue: 0.44)
+    static let peach = Color(red: 1.00, green: 0.64, blue: 0.53)
+    static let orange = Color(red: 1.00, green: 0.58, blue: 0.37)
+    static let teal = Color(red: 0.16, green: 0.78, blue: 0.73)
+    static let mint = Color(red: 0.44, green: 0.92, blue: 0.82)
+    static let purple = Color(red: 0.60, green: 0.44, blue: 0.98)
+    static let lavender = Color(red: 0.73, green: 0.57, blue: 1.00)
+    static let skyBlue = Color(red: 0.33, green: 0.63, blue: 1.00)
+    static let lightBlue = Color(red: 0.60, green: 0.80, blue: 1.00)
+    static let yellow = Color(red: 0.99, green: 0.84, blue: 0.40)
+    static let green = Color(red: 0.26, green: 0.85, blue: 0.48)
 
-    static let cardBackground = Color(.systemBackground)
-    static let secondaryBackground = Color(.secondarySystemBackground)
+    // Surfaces
+    static let background = Color(.systemBackground)
+    static let elevatedBackground = Color(.secondarySystemBackground)
+    static let subtleElevatedBackground = Color.white.opacity(0.06)
+
+    // Legacy aliases (for existing usage)
+    static let cardBackground = elevatedBackground
+    static let secondaryBackground = elevatedBackground
     static let textPrimary = Color(.label)
     static let textSecondary = Color(.secondaryLabel)
 }
@@ -25,32 +32,65 @@ enum AppColors {
 
 enum AppGradients {
     static let primary = LinearGradient(
-        colors: [AppColors.coral, AppColors.orange],
-        startPoint: .topLeading, endPoint: .bottomTrailing
+        colors: [
+            AppColors.coral.opacity(0.95),
+            AppColors.orange.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
     )
+
     static let teal = LinearGradient(
-        colors: [AppColors.teal, AppColors.mint],
-        startPoint: .topLeading, endPoint: .bottomTrailing
+        colors: [
+            AppColors.teal.opacity(0.95),
+            AppColors.mint.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
     )
+
     static let purple = LinearGradient(
-        colors: [AppColors.purple, AppColors.lavender],
-        startPoint: .topLeading, endPoint: .bottomTrailing
+        colors: [
+            AppColors.purple.opacity(0.95),
+            AppColors.lavender.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
     )
+
     static let blue = LinearGradient(
-        colors: [AppColors.skyBlue, AppColors.lightBlue],
-        startPoint: .topLeading, endPoint: .bottomTrailing
+        colors: [
+            AppColors.skyBlue.opacity(0.95),
+            AppColors.lightBlue.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
     )
+
     static let discover = LinearGradient(
-        colors: [AppColors.purple, AppColors.skyBlue],
-        startPoint: .topLeading, endPoint: .bottomTrailing
+        colors: [
+            AppColors.purple.opacity(0.95),
+            AppColors.skyBlue.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    static let green = LinearGradient(
+        colors: [
+            AppColors.green.opacity(0.95),
+            AppColors.mint.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
     )
     static let authBackground = LinearGradient(
         colors: [
-            AppColors.coral.opacity(0.15),
+            AppColors.coral.opacity(0.18),
             AppColors.peach.opacity(0.10),
-            Color(.systemBackground)
+            AppColors.background
         ],
-        startPoint: .top, endPoint: .bottom
+        startPoint: .top,
+        endPoint: .bottom
     )
 }
 
@@ -61,15 +101,18 @@ struct GradientButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.headline.weight(.semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(gradient)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(gradient)
+                    .shadow(color: AppColors.coral.opacity(configuration.isPressed ? 0.15 : 0.28), radius: 16, x: 0, y: 10)
+            )
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
@@ -105,8 +148,11 @@ struct StyledTextField: View {
             }
         }
         .padding(14)
-        .background(AppColors.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(AppColors.elevatedBackground.opacity(0.9))
+                .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 4)
+        )
     }
 }
 
@@ -115,10 +161,12 @@ struct StyledTextField: View {
 struct CardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding()
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(AppColors.elevatedBackground.opacity(0.98))
+                    .shadow(color: .black.opacity(0.05), radius: 16, x: 0, y: 8)
+            )
     }
 }
 
@@ -136,16 +184,31 @@ struct GradientCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding()
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(gradient)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(gradient)
+                    .overlay(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.25),
+                                .white.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .blendMode(.softLight)
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 22, x: 0, y: 14)
+            )
     }
 }
 
 // MARK: - Category Helpers
 
 enum TransactionCategory: String, CaseIterable, Codable {
+    case income = "Income"
     case food = "Food"
     case transport = "Transport"
     case entertainment = "Entertainment"
@@ -157,6 +220,7 @@ enum TransactionCategory: String, CaseIterable, Codable {
 
     var icon: String {
         switch self {
+        case .income: return "arrow.down.left.circle.fill"
         case .food: return "fork.knife"
         case .transport: return "car.fill"
         case .entertainment: return "gamecontroller.fill"
@@ -170,6 +234,7 @@ enum TransactionCategory: String, CaseIterable, Codable {
 
     var color: Color {
         switch self {
+        case .income: return AppColors.green
         case .food: return AppColors.orange
         case .transport: return AppColors.skyBlue
         case .entertainment: return AppColors.purple

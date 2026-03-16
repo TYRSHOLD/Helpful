@@ -74,7 +74,7 @@ struct SpendingWidgetView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ForEach(entry.recentItems.prefix(3), id: \.category) { item in
+                ForEach(Array(entry.recentItems.prefix(3).enumerated()), id: \.offset) { _, item in
                     HStack {
                         Text(item.category)
                             .font(.caption)

@@ -1,0 +1,13 @@
+{
+  "name": "helpful",
+  "private": true,
+  "description": "Helpful app – Firebase CLI for functions",
+  "scripts": {
+    "emulators": "firebase emulators:start --only functions",
+    "deploy:functions": "firebase deploy --only functions",
+    "start:functions": "npm install && cd functions && npm install && cd .. && firebase emulators:start --only functions"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.0.0"
+  }
+}

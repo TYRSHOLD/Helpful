@@ -13,6 +13,9 @@ final class AuthViewModel {
     var userName: String = ""
     var currentUser: AppUser?
 
+    /// Firebase Auth UID for the current user (use this for API calls that need the user id).
+    var currentUserId: String? { Auth.auth().currentUser?.uid }
+
     @ObservationIgnored
     private var authHandle: AuthStateDidChangeListenerHandle?
 

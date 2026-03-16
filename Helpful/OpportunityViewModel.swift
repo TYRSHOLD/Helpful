@@ -26,6 +26,9 @@ final class OpportunityViewModel {
     @ObservationIgnored
     private var lastDismissed: Opportunity?
 
+    @ObservationIgnored
+    private var cachedInterestQuery: String?
+
     var savedCount: Int { savedOpportunities.count }
 
     // MARK: - Lifecycle
@@ -55,6 +58,7 @@ final class OpportunityViewModel {
             currentPage = 1
             hasMorePages = true
             cardStack = []
+            cachedInterestQuery = nil
         }
 
         guard hasMorePages else { return }
@@ -65,8 +69,20 @@ final class OpportunityViewModel {
             dismissedIds = Set(try await firestoreService.fetchDismissedIds())
             let savedIds = Set(savedOpportunities.map { $0.externalId })
 
+            let interestQuery: String
+            if let cachedInterestQuery {
+                interestQuery = cachedInterestQuery
+            } else {
+                let interests = try await firestoreService.fetchOpportunityInterests()
+                let mapped = interests.map(Self.keyword(for:))
+                let cleaned = mapped.filter { !$0.isEmpty }
+                let query = cleaned.isEmpty ? "student" : cleaned.joined(separator: " OR ")
+                cachedInterestQuery = query
+                interestQuery = query
+            }
+
             let results = try await apiService.fetchOpportunities(
-                query: "student",
+                query: interestQuery,
                 type: type,
                 page: currentPage
             )
@@ -86,6 +102,14 @@ final class OpportunityViewModel {
         }
 
         isLoading = false
+    }
+
+    private static func keyword(for key: String) -> String {
+        switch key {
+        case "computer_science": return "computer science"
+        case "social_work": return "social work"
+        default: return key.replacingOccurrences(of: "_", with: " ")
+        }
     }
 
     // MARK: - Swipe Actions

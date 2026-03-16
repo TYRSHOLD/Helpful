@@ -13,6 +13,8 @@ Packages/
 
 # Secrets
 Helpful/Secrets.plist
+functions/.env
+functions/.env.*
 
 # macOS
 .DS_Store

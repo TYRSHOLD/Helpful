@@ -87,6 +87,7 @@ final class BudgetViewModel {
         isLoading = true
         do {
             budgets = try await service.fetchBudgets()
+            syncWidgetData()
         } catch {
             errorMessage = error.localizedDescription
         }
