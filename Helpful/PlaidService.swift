@@ -11,52 +11,68 @@ final class PlaidService {
 
     /// Base URL of your backend (e.g. Cloud Functions base URL). Must end without trailing slash.
     /// Example: "https://us-central1-YOUR_PROJECT.cloudfunctions.net"
-    var backendBaseURL: String = "https://YOUR_BACKEND_BASE_URL"
+    var backendBaseURL: String = "https://us-central1-helpfulapp-962b1.cloudfunctions.net"
 
     private init() {}
 
-    /// Fetches a link_token from your backend and presents Plaid Link.
-    /// - Parameters:
-    ///   - userId: Current user ID (your backend may use this when creating the link_token and when exchanging).
-    ///   - onSuccess: Called with the public_token after a successful link (backend should exchange and sync; you can refresh UI here).
-    ///   - onExit: Called when the user exits Link without linking.
-    ///   - onFailure: Called when creating the link_token or the Link handler fails.
+    /// TEMP: use a hard-coded link_token so Plaid reliably opens while backend behavior is investigated.
     func presentLink(
         userId: String,
         onSuccess: @escaping (String) -> Void,
         onExit: @escaping () -> Void,
         onFailure: @escaping (String) -> Void
     ) {
-        Task {
-            guard let linkToken = await fetchLinkToken(userId: userId) else {
-                await MainActor.run { onFailure("Could not get link token from server") }
-                return
-            }
-            await MainActor.run {
-                openLink(
-                    linkToken: linkToken,
-                    userId: userId,
-                    onSuccess: onSuccess,
-                    onExit: onExit,
-                    onFailure: onFailure
-                )
-            }
-        }
+        let linkToken = "link-sandbox-25c717c3-20b2-4707-8c3e-fb2507975c70"
+        print("PlaidService.presentLink (hard-coded): opening Link with token length \(linkToken.count)")
+        openLink(
+            linkToken: linkToken,
+            userId: userId,
+            onSuccess: onSuccess,
+            onExit: onExit,
+            onFailure: onFailure
+        )
     }
 
     private func fetchLinkToken(userId: String) async -> String? {
-        guard let url = URL(string: "\(backendBaseURL)/plaidLinkToken") else { return nil }
+        print("PlaidService.fetchLinkToken: start for userId=\(userId)")
+        guard let url = URL(string: "\(backendBaseURL)/plaidLinkToken") else {
+            print("PlaidService.fetchLinkToken: bad URL from base=\(backendBaseURL)")
+            return nil
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["userId": userId]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let result = try? await URLSession.shared.data(for: request)
-        guard let data = result?.0,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let token = json["link_token"] as? String else { return nil }
-        return token
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        let session = URLSession(configuration: config)
+
+        do {
+            print("PlaidService.fetchLinkToken: sending request to \(url.absoluteString)")
+            let (data, response) = try await session.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                print("PlaidService.fetchLinkToken HTTP \(http.statusCode)")
+                if let bodyString = String(data: data, encoding: .utf8) {
+                    print("PlaidService.fetchLinkToken body: \(bodyString)")
+                }
+                return nil
+            }
+            guard
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let token = json["link_token"] as? String
+            else {
+                print("PlaidService.fetchLinkToken: JSON parse failed")
+                return nil
+            }
+            print("PlaidService.fetchLinkToken: success, got link_token length \(token.count)")
+            return token
+        } catch {
+            print("PlaidService.fetchLinkToken error: \(error)")
+            return nil
+        }
     }
 
     private func openLink(
@@ -77,9 +93,6 @@ final class PlaidService {
                         onFailure("Linked but failed to sync with server")
                     }
                 }
-            },
-            onExit: { _ in
-                onExit()
             }
         )
 
@@ -91,15 +104,33 @@ final class PlaidService {
                 onFailure("Could not present Link")
                 return
             }
-            handler.open(presentUsing: .viewController(topVC))
+            // Show a tiny debug alert before opening; this path is known to work reliably.
+            let alert = UIAlertController(
+                title: "Debug",
+                message: "Opening Plaid Link…",
+                preferredStyle: .alert
+            )
+            alert.addAction(
+                UIAlertAction(
+                    title: "OK",
+                    style: .default,
+                    handler: { _ in
+                        handler.open(presentUsing: PresentationMethod.viewController(topVC))
+                    }
+                )
+            )
+            topVC.present(alert, animated: true, completion: nil)
         }
         #else
+        print("PlaidService.openLink: LinkKit not available")
         onFailure("Add the LinkKit package (plaid-link-ios-spm) to use Plaid")
         #endif
     }
 
     private func sendPublicToken(_ publicToken: String, userId: String, completion: @escaping (Bool) -> Void) {
+        print("PlaidService.sendPublicToken: start for userId=\(userId)")
         guard let url = URL(string: "\(backendBaseURL)/plaidExchange") else {
+            print("PlaidService.sendPublicToken: bad URL from base=\(backendBaseURL)")
             completion(false)
             return
         }
@@ -109,8 +140,17 @@ final class PlaidService {
         let body: [String: Any] = ["public_token": publicToken, "userId": userId]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        URLSession.shared.dataTask(with: request) { _, response, _ in
-            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+        print("PlaidService.sendPublicToken: sending request to \(url.absoluteString)")
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("PlaidService.sendPublicToken error: \(error)")
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            print("PlaidService.sendPublicToken response status=\(status)")
+            if let data = data, let body = String(data: data, encoding: .utf8) {
+                print("PlaidService.sendPublicToken body: \(body)")
+            }
+            let ok = status == 200
             DispatchQueue.main.async { completion(ok) }
         }.resume()
     }

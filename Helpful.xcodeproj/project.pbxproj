@@ -13,6 +13,7 @@
 		AB0BEE2C2F48A558000B5DF3 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0BEE2B2F48A557000B5DF3 /* WidgetKit.framework */; };
 		AB0BEE2E2F48A558000B5DF3 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0BEE2D2F48A558000B5DF3 /* SwiftUI.framework */; };
 		AB0BEE3F2F48A55A000B5DF3 /* HelpfulWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AB0BEE292F48A557000B5DF3 /* HelpfulWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		ABCE40722F67D8BA00CEF77E /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = ABCE40712F67D8BA00CEF77E /* LinkKit */; };
 		ABD67D822F59A57500E259AA /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = ABD67D812F59A57500E259AA /* FirebaseAI */; };
 /* End PBXBuildFile section */
 
@@ -92,6 +93,7 @@
 				AB0BED972F3D0A49000B5DF3 /* FirebaseAuth in Frameworks */,
 				AB0BED992F3D0A49000B5DF3 /* FirebaseFirestore in Frameworks */,
 				AB0BED9B2F3D0A49000B5DF3 /* FirebaseStorage in Frameworks */,
+				ABCE40722F67D8BA00CEF77E /* LinkKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -161,6 +163,7 @@
 				AB0BED982F3D0A49000B5DF3 /* FirebaseFirestore */,
 				AB0BED9A2F3D0A49000B5DF3 /* FirebaseStorage */,
 				ABD67D812F59A57500E259AA /* FirebaseAI */,
+				ABCE40712F67D8BA00CEF77E /* LinkKit */,
 			);
 			productName = Helpful;
 			productReference = AB0BED732F3A5DEA000B5DF3 /* Helpful.app */;
@@ -217,6 +220,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AB0BED952F3D0A49000B5DF3 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				ABCE40702F67D5EB00CEF77E /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AB0BED742F3A5DEA000B5DF3 /* Products */;
@@ -564,6 +568,14 @@
 				minimumVersion = 12.9.0;
 			};
 		};
+		ABCE40702F67D5EB00CEF77E /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/plaid/plaid-link-ios-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -581,6 +593,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AB0BED952F3D0A49000B5DF3 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		ABCE40712F67D8BA00CEF77E /* LinkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ABCE40702F67D5EB00CEF77E /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
+			productName = LinkKit;
 		};
 		ABD67D812F59A57500E259AA /* FirebaseAI */ = {
 			isa = XCSwiftPackageProductDependency;
