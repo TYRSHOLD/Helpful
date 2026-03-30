@@ -20,3 +20,4 @@ functions/.env.*
 .DS_Store
 *.swp
 *~
+firebase-debug.log
